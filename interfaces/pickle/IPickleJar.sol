@@ -9,5 +9,4 @@ interface IPickleJar {
     function balanceOf(address account) external view returns (uint256);
     function depositAll() external;
     function deposit(uint256 _amount) external;
-    function withdrawAll() external;
 }

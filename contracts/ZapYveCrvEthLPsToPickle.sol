@@ -86,8 +86,9 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         governance = _governance;
     }
 
-    // Accept ETH and zap in with no token swap
+    /*  ETH Zap  */
     receive() external payable {
+        // Allow ETH to be sent in from DEX routers, but reject for all others when reEntry = true
         if (reEntry && msg.sender != activeDex && msg.sender != sushiswapRouter) {
             require(msg.value == 0, "No re-entrancy!");
         }
@@ -97,6 +98,7 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         }
     }
 
+    /*  CRV Zap  */
     function zapIn(uint256 crvAmount) external payable {
         require(crvAmount != 0, "0 CRV");
         if (reEntry) {
@@ -109,14 +111,20 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
     }
 
     function _zapIn(bool _isEth, uint _haveAmount) internal returns (uint256) {
-        // Step 1:
-        // Get current reserves of each token in the target LP pair
+        /* 
+            Step 1:
+            Get current reserves of each token in the target LP pair
+        */
         IUniswapV2Pair pair = IUniswapV2Pair(ethYveCrv); // Pair we target our LP allocation against
         (uint256 reserveA, uint256 reserveB, ) = pair.getReserves();
-        
-        // Step 2:
-        // Calculate how much to swap into pool in order to make our balance equal part A and B
-        // The outputs will be the balanced LP deposit
+
+        /*
+            Step 2:
+            Calculate how much to swap into pool in order to make our balance equal part A and B
+            The outputs amounts should be a balanced LP deposit
+            calculateSwapInAmount uses algo described in this blog post:
+            https://blog.alphafinance.io/onesideduniswap/
+        */
         uint256 amountToSwap = 0;
         if(_isEth){
             amountToSwap = calculateSwapInAmount(reserveA, _haveAmount);
@@ -128,14 +136,18 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
             IERC20(crv).balanceOf(address(this));
         }
         
-        // Step 3: 
-        // Deposit CRV into yveCrv and receieve yveCRV tokens
+        /*
+            Step 3: 
+            Deposit CRV into yveCrv and receieve yveCRV tokens
+        */
         yVault.depositAll();
         
-        // Step 4:
-        // Add liquidity to the Sushi ETH/yveCrv pair
+        /*
+            Step 4:
+            Add liquidity to the Sushi ETH/yveCrv pair
+        */
         IUniswapV2Router02(sushiswapRouter).addLiquidityETH{value: address(this).balance}( 
-            yveCrv, // Non-ETH token of pool
+            yveCrv, // The non-ETH token in pair
             yVault.balanceOf(address(this)), // Desired amount of token
             1, // Token min
             1, // Eth min
@@ -143,10 +155,11 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
             now // deadline
         );
         
-        // Step 5:
-        // Deposit LP tokens to Pickle jar and send tokens back to user
+        /*
+            Step 5:
+            Deposit LP tokens to Pickle jar and send tokens back to user
+        */
         pickleJar.depositAll();
-        // Send user their Pick Sushi LPs
         IERC20(address(pickleJar)).safeTransfer(msg.sender, pickleJar.balanceOf(address(this)));
         
         reEntry = false;
@@ -181,5 +194,9 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         swapRouter = IUniswapV2Router02(activeDex);
         swapPair = _pairAddress;
         IERC20(crv).safeApprove(activeDex, uint256(-1));
-    }    
+    }
+
+    function sweep(address _token) external onlyGovernance {
+        IERC20(_token).safeTransfer(governance(), IERC20(_token).balanceOf(address(this)));
+    }
 }
