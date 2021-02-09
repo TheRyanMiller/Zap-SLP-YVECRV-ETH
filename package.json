@@ -1,0 +1,14 @@
+{
+    "name": "hegicBot",
+    "devDependencies": {
+        "@commitlint/cli": "^11.0.0",
+        "@commitlint/config-conventional": "^11.0.0",
+        "ethlint": "^1.2.5",
+        "prettier": "^2.2.1",
+        "prettier-plugin-solidity": "^1.0.0-beta.1",
+        "pretty-quick": "^3.0.2"
+    },
+    "scripts": {
+        "prettier": "prettier --write 'contracts/**/*.sol'"
+    }
+}
