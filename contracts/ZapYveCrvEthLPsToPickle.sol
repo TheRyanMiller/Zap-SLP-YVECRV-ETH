@@ -113,10 +113,7 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         // Get current reserves of each token in the target LP pair
         IUniswapV2Pair pair = IUniswapV2Pair(ethYveCrv); // Pair we target our LP allocation against
         (uint256 reserveA, uint256 reserveB, ) = pair.getReserves();
-
-        IUniswapV2Pair pair2 = IUniswapV2Pair(swapPair); // Pair we target our LP allocation against
-        (uint256 reserve1, uint256 reserve2, ) = pair.getReserves();
-
+        
         // Step 2:
         // Calculate how much to swap into pool in order to make our balance equal part A and B
         // The outputs will be the balanced LP deposit
@@ -136,7 +133,7 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         yVault.depositAll();
         
         // Step 4:
-        // LP in the Sushi ETH/yveCrv pair
+        // Add liquidity to the Sushi ETH/yveCrv pair
         IUniswapV2Router02(sushiswapRouter).addLiquidityETH{value: address(this).balance}( 
             yveCrv, // Non-ETH token of pool
             yVault.balanceOf(address(this)), // Desired amount of token
@@ -147,14 +144,14 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         );
         
         // Step 5:
-        // Deposit to Pickle jar and send tokens to user
+        // Deposit LP tokens to Pickle jar and send tokens back to user
         pickleJar.depositAll();
         // Send user their Pick Sushi LPs
         IERC20(address(pickleJar)).safeTransfer(msg.sender, pickleJar.balanceOf(address(this)));
         
         reEntry = false;
     }
-    
+
     function calculateSwapInAmount(uint256 reserveIn, uint256 userIn) internal pure returns (uint256) {
         return
             Babylonian.sqrt(
