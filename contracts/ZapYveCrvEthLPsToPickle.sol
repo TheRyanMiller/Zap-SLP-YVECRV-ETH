@@ -47,11 +47,10 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
     address private mooniswappool = 0x1f629794B34FFb3B29FF206Be5478A52678b47ae;
     IUniswapV2Router02 public swapRouter;
     
-    // Sushi Pair
-    address public swapPair = 0x58Dc5a51fE44589BEb22E8CE67720B5BC5378009;
-    // Uniswap Pair
-    address public constant ethCrvU = 0x3dA1313aE46132A397D90d95B1424A9A7e3e0fCE;
-    //Paths
+    // ETH/CRV pair we want to swap with
+    address public swapPair = 0x58Dc5a51fE44589BEb22E8CE67720B5BC5378009; // Initialize with Sushiswap
+    
+    // Dex swap paths
     address[] public swapEthPath;
     address[] public swapCrvPath;
 
@@ -89,12 +88,12 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
 
     // Accept ETH and zap in with no token swap
     receive() external payable {
-        if (reEntry && msg.sender != activeDex) {
-            return;
+        if (reEntry && msg.sender != activeDex && msg.sender != sushiswapRouter) {
+            require(msg.value == 0, "No re-entrancy!");
         }
-        if(msg.sender != activeDex){
+        if(msg.sender != activeDex && msg.sender != sushiswapRouter){
             reEntry = true;
-            _zapIn(true, address(this).balance);
+            _zapIn(true, msg.value);
         }
     }
 
@@ -110,27 +109,26 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
     }
 
     function _zapIn(bool _isEth, uint _haveAmount) internal returns (uint256) {
-        IUniswapV2Pair pair = IUniswapV2Pair(swapPair);
-        
         // Step 1:
-        // Get current amounts of each token in the swap pair
+        // Get current reserves of each token in the target LP pair
+        IUniswapV2Pair pair = IUniswapV2Pair(ethYveCrv); // Pair we target our LP allocation against
         (uint256 reserveA, uint256 reserveB, ) = pair.getReserves();
+
+        IUniswapV2Pair pair2 = IUniswapV2Pair(swapPair); // Pair we target our LP allocation against
+        (uint256 reserve1, uint256 reserve2, ) = pair.getReserves();
 
         // Step 2:
         // Calculate how much to swap into pool in order to make our balance equal part A and B
         // The outputs will be the balanced LP deposit
         uint256 amountToSwap = 0;
-        uint256 amtEthToLP = 0;
-        uint256 amtYveCrvToLP = 0;
         if(_isEth){
             amountToSwap = calculateSwapInAmount(reserveA, _haveAmount);
-            amtYveCrvToLP = _tokenSwap(amountToSwap, true);
-            amtEthToLP = address(this).balance;
+            _tokenSwap(amountToSwap, true);
         }
         else{
             amountToSwap = calculateSwapInAmount(reserveB, _haveAmount);
-            amtEthToLP = _tokenSwap(amountToSwap, false);
-            amtYveCrvToLP = IERC20(crv).balanceOf(address(this));
+            _tokenSwap(amountToSwap, false);
+            IERC20(crv).balanceOf(address(this));
         }
         
         // Step 3: 
@@ -139,7 +137,7 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         
         // Step 4:
         // LP in the Sushi ETH/yveCrv pair
-        (uint256 amtYveCrvAdded, uint256 amtETHAdded, uint256 amountLPs) = IUniswapV2Router02(sushiswapRouter).addLiquidityETH{value: address(this).balance}( 
+        IUniswapV2Router02(sushiswapRouter).addLiquidityETH{value: address(this).balance}( 
             yveCrv, // Non-ETH token of pool
             yVault.balanceOf(address(this)), // Desired amount of token
             1, // Token min
@@ -153,18 +151,10 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         pickleJar.depositAll();
         // Send user their Pick Sushi LPs
         IERC20(address(pickleJar)).safeTransfer(msg.sender, pickleJar.balanceOf(address(this)));
-
+        
         reEntry = false;
     }
-
-    function checkBalances() external view returns (uint256 _crv, uint256 _eth, uint256 _yvecrv, uint256 _pSLP, uint _ethYveCrv){
-        _pSLP = IERC20(address(pickleJar)).balanceOf(address(this));
-        _crv = IERC20(address(crv)).balanceOf(address(this));
-        _eth = address(this).balance;
-        _yvecrv = IERC20(address(yVault)).balanceOf(address(this));
-        _ethYveCrv = IERC20(address(ethYveCrv)).balanceOf(address(this));
-    }
-
+    
     function calculateSwapInAmount(uint256 reserveIn, uint256 userIn) internal pure returns (uint256) {
         return
             Babylonian.sqrt(
