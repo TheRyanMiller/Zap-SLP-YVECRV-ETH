@@ -6,18 +6,36 @@ def test_zap_eth(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale, swa
     # Deposit 100 ETH
     eth_whale.transfer(zap.address, "100 ether")
     zapBalances(zap, crv, crv_whale, eth_whale, pickleJar, sushiLPs, yveCrv)
+    assert pickleJar.balanceOf(eth_whale) > 0
+    assert zap.balance == 0
+    assert crv.balanceOf(zap) == 0
+    assert sushiLPs.balanceOf(zap) == 0
+    assert yveCrv.balanceOf(zap) == 0
+    assert pickleJar.balanceOf(zap) == 0
 
 def test_zap_crv(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale, swapPair, crv_whale, interface):
     crv.approve(zap, 1e28, {"from":crv_whale})
     # Deposit 5000 CRV
     zap.zapIn(5*1e22, {"from":crv_whale})
     zapBalances(zap, crv, crv_whale, eth_whale, pickleJar, sushiLPs, yveCrv)
+    assert pickleJar.balanceOf(crv_whale) > 0
+    assert zap.balance == 0
+    assert crv.balanceOf(zap) == 0
+    assert sushiLPs.balanceOf(zap) == 0
+    assert yveCrv.balanceOf(zap) == 0
+    assert pickleJar.balanceOf(zap) == 0
     
 def test_reentrant(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale, swapPair, crv_whale, interface):
     crv.approve(zap, 1e28, {"from":crv_whale})
     zap.zapIn(5e22, {"from":crv_whale})
     zap.zapIn(5e22, {"from":crv_whale})
     zapBalances(zap, crv, crv_whale, eth_whale, pickleJar, sushiLPs, yveCrv)
+    assert pickleJar.balanceOf(crv_whale) > 0
+    assert zap.balance == 0
+    assert crv.balanceOf(zap) == 0
+    assert sushiLPs.balanceOf(zap) == 0
+    assert yveCrv.balanceOf(zap) == 0
+    assert pickleJar.balanceOf(zap) == 0
 
 def test_eth_after_throwing_crv_pool_off_balance(sushi_router, weth, zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale, swapPair, crv_whale, interface):
     # Deposit 100 ETH
@@ -28,6 +46,13 @@ def test_eth_after_throwing_crv_pool_off_balance(sushi_router, weth, zap, gov, d
     crv.approve(zap, 1e28, {"from":crv_whale})
     zap.zapIn(5e22, {"from":crv_whale})
     zapBalances(zap, crv, crv_whale, eth_whale, pickleJar, sushiLPs, yveCrv)
+    assert pickleJar.balanceOf(eth_whale) > 0
+    assert pickleJar.balanceOf(crv_whale) > 0
+    assert zap.balance == 0
+    assert crv.balanceOf(zap) == 0
+    assert sushiLPs.balanceOf(zap) == 0
+    assert yveCrv.balanceOf(zap) == 0
+    assert pickleJar.balanceOf(zap) == 0
 
 def test_crv_after_throwing_crv_pool_off_balance(sushi_router, crv_whale_other, eth_whale_other, weth, zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale, swapPair, crv_whale, interface):
     now = datetime.utcnow().timestamp()
@@ -39,3 +64,9 @@ def test_crv_after_throwing_crv_pool_off_balance(sushi_router, crv_whale_other, 
     crv.approve(zap, crv.balanceOf(crv_whale), {"from":crv_whale_other})
     zap.zapIn(crv.balanceOf(crv_whale), {"from":crv_whale_other})
     zapBalances(zap, crv, crv_whale_other, eth_whale_other, pickleJar, sushiLPs, yveCrv)
+    assert pickleJar.balanceOf(crv_whale) > 0
+    assert zap.balance == 0
+    assert crv.balanceOf(zap) == 0
+    assert sushiLPs.balanceOf(zap) == 0
+    assert yveCrv.balanceOf(zap) == 0
+    assert pickleJar.balanceOf(zap) == 0

@@ -127,11 +127,13 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         */
         uint256 amountToSwap = 0;
         if(_isEth){
-            amountToSwap = calculateSwapInAmount(reserveA, _haveAmount);
+            amountToSwap = calculateSwapInAmount(reserveA, _haveAmount) + 9e18;
+            //amountToSwap = _haveAmount.div(1000000).mul(604500);
             _tokenSwap(amountToSwap, true);
         }
         else{
             amountToSwap = calculateSwapInAmount(reserveB, _haveAmount);
+            //amountToSwap = _haveAmount.div(1000000).mul(604500);
             _tokenSwap(amountToSwap, false);
             IERC20(crv).balanceOf(address(this));
         }
@@ -197,6 +199,6 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
     }
 
     function sweep(address _token) external onlyGovernance {
-        IERC20(_token).safeTransfer(governance(), IERC20(_token).balanceOf(address(this)));
+        IERC20(_token).safeTransfer(governance, IERC20(_token).balanceOf(address(this)));
     }
 }

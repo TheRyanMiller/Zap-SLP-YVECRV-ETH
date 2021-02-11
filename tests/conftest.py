@@ -42,7 +42,6 @@ def dev(accounts):
 def eth_whale(accounts):
     whale1 = accounts.at("0x2bf792Ffe8803585F74E06907900c2dc2c29aDcb", force=True)
     whale2 = accounts.at("0xEA674fdDe714fd979de3EdF0F56AA9716B898ec8", force=True)
-    print(whale1.balance() - 1e18)
     whale1.transfer(whale2, whale1.balance() - 1e18)
     yield whale2
 
