@@ -56,7 +56,10 @@ def crv_whale(crv, accounts):
     whale2 = accounts.at("0xc0AA8046f860996B7B6d366b6d71391e70C74376", force=True)
     # We use tranfer, not transferFrom here because it is not a contract
     crv.transfer(whale2, crv.balanceOf(whale1), {"from":whale1})
-    yield whale2
+    crv.transfer(accounts[5], crv.balanceOf(whale2), {"from":whale2})
+    accounts[5].transfer(accounts[9], accounts[5].balance() - 1e18)
+    assert crv.balanceOf(accounts[5]) > 0
+    yield accounts[5]
 
 @pytest.fixture
 def crv_whale_other(crv, accounts):

@@ -21,4 +21,3 @@ compiler:
 
 reports:
   exclude_contracts:
-    - SafeMath
