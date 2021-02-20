@@ -59,8 +59,6 @@ def crv_whale(crv, accounts):
     crv.transfer(accounts[5], crv.balanceOf(whale2), {"from":whale2})
     accounts[5].transfer(accounts[9], accounts[5].balance() - 1e18)
     assert crv.balanceOf(accounts[5]) > 0
-    print("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
-    print(crv.balanceOf(accounts[5]))
     yield accounts[5]
 
 @pytest.fixture

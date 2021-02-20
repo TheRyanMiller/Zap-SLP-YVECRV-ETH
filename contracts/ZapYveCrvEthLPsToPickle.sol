@@ -114,7 +114,7 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         _zapIn(false, crvAmount);
     }
 
-    function _zapIn(bool _isEth, uint _haveAmount) internal returns (uint256) {
+    function _zapIn(bool _isEth, uint256 _haveAmount) internal returns (uint256) {
 
         /*
             Step 1:
@@ -128,8 +128,9 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         /*
             Step 2:
             Swap token
-        */
+        
         _tokenSwap(amountToSwap, _isEth);
+        */
         /*
             Step 3: 
             Deposit CRV into yveCrv and receieve yveCRV tokens
@@ -147,8 +148,8 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
             1, // Eth min
             address(this), // Where to send LP tokens
             now // deadline
-        );*/
-        
+        );
+        */
         /*
             Step 5:
             Deposit LP tokens to Pickle jar and send tokens back to user
@@ -193,6 +194,9 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         (uint256 reserveA, uint256 reserveB, ) = pair.getReserves();
         int256 pool1HaveReserve = 0;
         int256 pool1WantReserve = 0;
+        int256 rb = 0;
+        int256 ra = 0;
+        
         if(_isEth){
             pool1HaveReserve = int256(reserveA);
             pool1WantReserve = int256(reserveB);
@@ -204,11 +208,10 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
 
         pair = IUniswapV2Pair(ethYveCrv);
         (reserveA, reserveB, ) = pair.getReserves();
-        int256 rb = 0;
-        int256 ra = 0;
+        
         if(_isEth){
-            rb = int256(reserveA);
             ra = int256(reserveB);
+            rb = int256(reserveA);
         }
         else{
             ra = int256(reserveA);
@@ -216,7 +219,7 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         }
         
         int256 numToSquare = int256(_haveAmount).mul(997).add(pool1HaveReserve.mul(1000));
-        int256 FACTOR = 100000000;
+        int256 FACTOR = 10000000000000000000;
         
         // LINE 1
         int256 a = pool1WantReserve.mul(-1994);
@@ -242,7 +245,7 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         int256 sq = Babylonian.sqrt(a);
         
         // LINE 4
-        FACTOR = 100000000;
+        FACTOR = 10000000000000000000;
         b = h.mul(997).mul(ra).mul(FACTOR).div(rb); // This is line 4
         // LINE 5
         r = pool1HaveReserve.mul(1000);
