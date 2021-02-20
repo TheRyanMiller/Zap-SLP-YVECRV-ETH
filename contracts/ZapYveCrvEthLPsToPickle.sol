@@ -34,6 +34,8 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
     using SafeMath for uint256;
     using SignedSafeMath for int256;
 
+    uint256 public amountOut = 0;
+
     // Tokens
     address public constant ethYveCrv = 0x10B47177E92Ef9D5C6059055d92DdF6290848991; // LP Token
     address public constant yveCrv = 0xc5bDdf9843308380375a611c18B50Fb9341f502A;
@@ -137,7 +139,7 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         /*
             Step 4:
             Add liquidity to the Sushi ETH/yveCrv pair
-        */
+        
         IUniswapV2Router02(sushiswapRouter).addLiquidityETH{value: address(this).balance}( 
             yveCrv, // The non-ETH token in pair
             yVault.balanceOf(address(this)), // Desired amount of token
@@ -145,7 +147,7 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
             1, // Eth min
             address(this), // Where to send LP tokens
             now // deadline
-        );
+        );*/
         
         /*
             Step 5:
@@ -157,13 +159,14 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         reEntry = false;
     }
 
-    function _tokenSwap(uint256 _amountIn, bool _isEth) internal returns (uint256 amountOut) {
+    function _tokenSwap(uint256 _amountIn, bool _isEth) internal returns (uint256) {
         if (_isEth) {
             amountOut = swapRouter.swapExactETHForTokens{value: _amountIn}(1, swapEthPath, address(this), now)[swapEthPath.length - 1];
         } else {
-            amountOut = swapRouter.swapExactTokensForETH(_amountIn, 1, swapCrvPath, address(this), now)[swapCrvPath.length - 1];
+            amountOut = _amountIn;//swapRouter.swapExactTokensForETH(_amountIn, 0, swapCrvPath, address(this), now)[swapCrvPath.length - 1];
         }
         require(amountOut > 0, "Error Swapping Tokens");
+        return amountOut;
     }
 
     function setActiveDex(uint256 exchange, address _pairAddress) public onlyGovernance {
@@ -212,7 +215,6 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
             rb = int256(reserveB);
         }
         
-
         int256 numToSquare = int256(_haveAmount).mul(997).add(pool1HaveReserve.mul(1000));
         int256 FACTOR = 100000000;
         

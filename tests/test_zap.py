@@ -4,7 +4,7 @@ from datetime import datetime
 """
 def test_zap_eth(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale, swapPair, crv_whale, interface):
     # Deposit 100 ETH
-    eth_whale.transfer(zap.address, "10 ether")
+    eth_whale.transfer(zap.address, "1 ether")
     zapBalances(zap, crv, crv_whale, eth_whale, pickleJar, sushiLPs, yveCrv)
     assert pickleJar.balanceOf(eth_whale) > 0
     assert zap.balance == 0
@@ -15,9 +15,11 @@ def test_zap_eth(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale, swa
 """
 def test_zap_crv(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale, swapPair, crv_whale, interface):
     # Deposit 5000 CRV
-    crv.approve(zap, 5*1e28, {"from":crv_whale})
-    zap.zapIn(5*1e22, {"from":crv_whale})
+    crv.approve(zap, 5e28, {"from":crv_whale})
+    zap.zapIn(5e21, {"from":crv_whale})
     zapBalances(zap, crv, crv_whale, eth_whale, pickleJar, sushiLPs, yveCrv)
+    print("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
+    print(zap.amountOut())
     assert pickleJar.balanceOf(crv_whale) > 0
     assert zap.balance == 0
     assert crv.balanceOf(zap) == 0
@@ -25,7 +27,6 @@ def test_zap_crv(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale, swa
     assert yveCrv.balanceOf(zap) == 0
     assert pickleJar.balanceOf(zap) == 0
 """
-
 def test_reentrant(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale, swapPair, crv_whale, interface):
     crv.approve(zap, 1e28, {"from":crv_whale})
     zap.zapIn(5e22, {"from":crv_whale})
