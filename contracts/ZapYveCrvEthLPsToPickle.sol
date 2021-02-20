@@ -34,7 +34,7 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
     using SafeMath for uint256;
     using SignedSafeMath for int256;
 
-    uint256 public amountOut = 0;
+    uint256 public amountToSwap = 0;
 
     // Tokens
     address public constant ethYveCrv = 0x10B47177E92Ef9D5C6059055d92DdF6290848991; // LP Token
@@ -124,13 +124,13 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
             https://blog.alphafinance.io/onesideduniswap/
         */
         
-        uint256 amountToSwap = calculateSwapAmount(_haveAmount, _isEth);
+        amountToSwap = calculateSwapAmount(_haveAmount, _isEth);
         /*
             Step 2:
             Swap token
-        
-        _tokenSwap(amountToSwap, _isEth);
         */
+        _tokenSwap(amountToSwap, _isEth);
+        
         /*
             Step 3: 
             Deposit CRV into yveCrv and receieve yveCRV tokens
@@ -140,7 +140,7 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         /*
             Step 4:
             Add liquidity to the Sushi ETH/yveCrv pair
-        
+        */
         IUniswapV2Router02(sushiswapRouter).addLiquidityETH{value: address(this).balance}( 
             yveCrv, // The non-ETH token in pair
             yVault.balanceOf(address(this)), // Desired amount of token
@@ -149,7 +149,7 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
             address(this), // Where to send LP tokens
             now // deadline
         );
-        */
+       
         /*
             Step 5:
             Deposit LP tokens to Pickle jar and send tokens back to user
@@ -161,10 +161,11 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
     }
 
     function _tokenSwap(uint256 _amountIn, bool _isEth) internal returns (uint256) {
+        uint256 amountOut = 0;
         if (_isEth) {
             amountOut = swapRouter.swapExactETHForTokens{value: _amountIn}(1, swapEthPath, address(this), now)[swapEthPath.length - 1];
         } else {
-            amountOut = _amountIn;//swapRouter.swapExactTokensForETH(_amountIn, 0, swapCrvPath, address(this), now)[swapCrvPath.length - 1];
+            amountOut = swapRouter.swapExactTokensForETH(_amountIn, 0, swapCrvPath, address(this), now)[swapCrvPath.length - 1];
         }
         require(amountOut > 0, "Error Swapping Tokens");
         return amountOut;
@@ -220,24 +221,24 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         
         int256 numToSquare = int256(_haveAmount).mul(997).add(pool1HaveReserve.mul(1000));
         int256 FACTOR = 10000000000000000000;
-        
+
         // LINE 1
-        int256 a = pool1WantReserve.mul(-1994);
-        a = a.mul(ra).mul(FACTOR).div(rb); // Line 1
+        int256 a = pool1WantReserve.mul(-1994).mul(ra).div(rb); // Line 1
         int256 b = int256(_haveAmount).mul(997); // line 1 , part 2
         b = b.sub(pool1HaveReserve.mul(1000));
-        b = a.mul(b).div(FACTOR); // Compete line 1
-        
+        b = a.mul(b); // Compete line 1
+
         // LINE 2
         a = ra.mul(ra).mul(FACTOR).div(rb);
         a = a.div(rb); // We lose some precision here
         int256 c = numToSquare.mul(numToSquare);
         a = c.mul(a).div(FACTOR); // Complete Line 2
+
         a = b.add(a); // Add line 1
         
         // LINE 3
         int256 h = int256(_haveAmount);
-        int256 r = pool1WantReserve.mul(pool1WantReserve); // square this from line 3
+        int256 r = pool1WantReserve.mul(pool1WantReserve);
         r = r.mul(994009);
         a = a.add(r); // Add line 3 to running total
         
@@ -245,8 +246,8 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         int256 sq = Babylonian.sqrt(a);
         
         // LINE 4
-        FACTOR = 10000000000000000000;
         b = h.mul(997).mul(ra).mul(FACTOR).div(rb); // This is line 4
+        FACTOR = 10000000000000000000;
         // LINE 5
         r = pool1HaveReserve.mul(1000);
         r = r.mul(ra).mul(FACTOR);
@@ -258,8 +259,8 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         b = b.add(sq);
         
         // LINE 6
-        a = ra.mul(1994).mul(FACTOR);
-        a = a.div(rb);
+        a = ra.mul(1994);
+        a = a.mul(FACTOR).div(rb); // We lose some precision here
         return uint256(b.mul(FACTOR).div(a));
     }
 }
