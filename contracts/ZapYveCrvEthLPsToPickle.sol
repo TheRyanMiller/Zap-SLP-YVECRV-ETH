@@ -34,8 +34,6 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
     using SafeMath for uint256;
     using SignedSafeMath for int256;
 
-    uint256 public amountToSwap = 0;
-
     // Tokens
     address public constant ethYveCrv = 0x10B47177E92Ef9D5C6059055d92DdF6290848991; // LP Token
     address public constant yveCrv = 0xc5bDdf9843308380375a611c18B50Fb9341f502A;
@@ -46,9 +44,7 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
 
     // DEXes
     address public activeDex = 0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // Sushi default
-    address private uniswapRouter = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
     address private sushiswapRouter = 0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F;
-    address private mooniswappool = 0x1f629794B34FFb3B29FF206Be5478A52678b47ae;
     IUniswapV2Router02 public swapRouter;
     
     // ETH/CRV pair we want to swap with
@@ -94,7 +90,7 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
     receive() external payable {
         // Allow ETH to be sent in from DEX routers, but reject for all others when reEntry = true
         if (reEntry && msg.sender != activeDex && msg.sender != sushiswapRouter) {
-            //require(msg.value == 0, "No re-entrancy!");
+            require(msg.value == 0, "No re-entrancy!");
         }
         if(msg.sender != activeDex && msg.sender != sushiswapRouter){
             reEntry = true;
@@ -111,49 +107,26 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         }
         reEntry = true;
         IERC20(crv).transferFrom(msg.sender, address(this), crvAmount);
-        _zapIn(false, crvAmount);
+        _zapIn(false, IERC20(crv).balanceOf(address(this))); // Include any dust from prev txns
     }
 
     function _zapIn(bool _isEth, uint256 _haveAmount) internal returns (uint256) {
 
-        /*
-            Step 1:
-            Calculate how much to swap into pool in order to make our balance equal part A and B
-            The outputs amounts should be a balanced LP deposit
-            calculateSwapInAmount uses algo described in this blog post:
-            https://blog.alphafinance.io/onesideduniswap/
-        */
+        //  Step 1: Calculate amount to swap        
+        uint256 amountToSwap = calculateSwapAmount(_haveAmount, _isEth);
         
-        amountToSwap = calculateSwapAmount(_haveAmount, _isEth);
-        /*
-            Step 2:
-            Swap token
-        */
+        //  Step 2: Swap token
         _tokenSwap(amountToSwap, _isEth);
         
-        /*
-            Step 3: 
-            Deposit CRV into yveCrv and receieve yveCRV tokens
-        */
+        //  Step 3: Deposit CRV into yveCrv and receieve yveCRV tokens
         yVault.depositAll();
         
-        /*
-            Step 4:
-            Add liquidity to the Sushi ETH/yveCrv pair
-        */
+        //  Step 4: Add liquidity to the Sushi ETH/yveCrv pair
         IUniswapV2Router02(sushiswapRouter).addLiquidityETH{value: address(this).balance}( 
-            yveCrv, // The non-ETH token in pair
-            yVault.balanceOf(address(this)), // Desired amount of token
-            1, // Token min
-            1, // Eth min
-            address(this), // Where to send LP tokens
-            now // deadline
+            yveCrv, yVault.balanceOf(address(this)), 1, 1, address(this), now
         );
        
-        /*
-            Step 5:
-            Deposit LP tokens to Pickle jar and send tokens back to user
-        */
+        //  Step 5: Deposit LP tokens to Pickle jar and send tokens back to user
         pickleJar.depositAll();
         IERC20(address(pickleJar)).safeTransfer(msg.sender, pickleJar.balanceOf(address(this)));
         
@@ -173,11 +146,9 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
 
     function setActiveDex(uint256 exchange, address _pairAddress) public onlyGovernance {
         if(exchange == 0){
-            activeDex = uniswapRouter;
-        }else if (exchange == 1) {
             activeDex = sushiswapRouter;
-        }else if (exchange == 2) {
-            activeDex = mooniswappool;
+        }else if (exchange == 1) {
+            activeDex = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
         }else{
             require(false, "incorrect pool");
         }
@@ -188,10 +159,14 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
 
     function sweep(address _token) external onlyGovernance {
         IERC20(_token).safeTransfer(governance, IERC20(_token).balanceOf(address(this)));
+        uint256 balance = address(this).balance;
+        if(balance > 0){
+            msg.sender.transfer(balance);
+        }
     }
 
     function calculateSwapAmount(uint256 _haveAmount, bool _isEth) internal view returns (uint256) {
-        IUniswapV2Pair pair = IUniswapV2Pair(swapPair); // Pair we target our LP allocation against
+        IUniswapV2Pair pair = IUniswapV2Pair(swapPair); // Pair we swap against
         (uint256 reserveA, uint256 reserveB, ) = pair.getReserves();
         int256 pool1HaveReserve = 0;
         int256 pool1WantReserve = 0;
@@ -207,7 +182,7 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
             pool1WantReserve = int256(reserveA);
         }
 
-        pair = IUniswapV2Pair(ethYveCrv);
+        pair = IUniswapV2Pair(ethYveCrv); // Pair we LP against
         (reserveA, reserveB, ) = pair.getReserves();
         
         if(_isEth){
@@ -219,42 +194,41 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
             rb = int256(reserveB);
         }
         
-        int256 numToSquare = int256(_haveAmount).mul(997).add(pool1HaveReserve.mul(1000));
-        int256 FACTOR = 10000000000000000000;
+        int256 numToSquare = int256(_haveAmount).mul(997).add(pool1HaveReserve.mul(1000)); // We'll need this later
+        int256 FACTOR = 1e20; // To help with precision
 
         // LINE 1
-        int256 a = pool1WantReserve.mul(-1994).mul(ra).div(rb); // Line 1
-        int256 b = int256(_haveAmount).mul(997); // line 1 , part 2
+        int256 a = pool1WantReserve.mul(-1994).mul(ra).div(rb);
+        int256 b = int256(_haveAmount).mul(997);
         b = b.sub(pool1HaveReserve.mul(1000));
-        b = a.mul(b); // Compete line 1
+        b = a.mul(b);
 
         // LINE 2
         a = ra.mul(ra).mul(FACTOR).div(rb);
         a = a.div(rb); // We lose some precision here
         int256 c = numToSquare.mul(numToSquare);
-        a = c.mul(a).div(FACTOR); // Complete Line 2
-
-        a = b.add(a); // Add line 1
+        a = c.mul(a).div(FACTOR);
+        a = b.add(a); // Add result to total
         
         // LINE 3
         int256 h = int256(_haveAmount);
         int256 r = pool1WantReserve.mul(pool1WantReserve);
         r = r.mul(994009);
-        a = a.add(r); // Add line 3 to running total
+        a = a.add(r); // Add result to total
         
         // Sqaure the total
         int256 sq = Babylonian.sqrt(a);
         
         // LINE 4
-        b = h.mul(997).mul(ra).mul(FACTOR).div(rb); // This is line 4
-        FACTOR = 10000000000000000000;
+        b = h.mul(997).mul(ra).mul(FACTOR).div(rb);
+        
         // LINE 5
+        FACTOR = 1e20; // re-state, otherwise stack depth is exceeded
         r = pool1HaveReserve.mul(1000);
         r = r.mul(ra).mul(FACTOR);
         r = r.div(rb);
         h = pool1WantReserve.mul(-997);
         h = h.mul(FACTOR).sub(r);
-        
         b = b.add(h).div(FACTOR);
         b = b.add(sq);
         
