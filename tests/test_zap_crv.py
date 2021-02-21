@@ -2,84 +2,18 @@ from brownie import Wei
 from helpers import zapBalances
 from datetime import datetime
 
-def test_zap_eth(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale, swapPair, crv_whale, interface):
-    # Zap 0.01 ETH
-    amount = 1e16
-    eth_whale.transfer(zap.address, amount)
-    acceptable_dust = 1e10
-    assert pickleJar.balanceOf(eth_whale) > 0
-    assert zap.balance() < acceptable_dust
-    assert crv.balanceOf(zap) < acceptable_dust
-    assert sushiLPs.balanceOf(zap) < acceptable_dust
-    assert yveCrv.balanceOf(zap) < acceptable_dust
-    assert pickleJar.balanceOf(zap) < acceptable_dust
-    prev_pickle_balance = pickleJar.balanceOf(eth_whale)
-
-    # Zap 0.1 ETH
-    amount = 1e17
-    eth_whale.transfer(zap.address, amount)
-    acceptable_dust = 1e10
-    assert pickleJar.balanceOf(eth_whale) - prev_pickle_balance > 0
-    assert zap.balance() < acceptable_dust
-    assert crv.balanceOf(zap) < acceptable_dust
-    assert sushiLPs.balanceOf(zap) < acceptable_dust
-    assert yveCrv.balanceOf(zap) < acceptable_dust
-    assert pickleJar.balanceOf(zap) < acceptable_dust
-    prev_pickle_balance = pickleJar.balanceOf(eth_whale)
-
-    # Deposit 1 ETH
-    amount = 1e18
-    eth_whale.transfer(zap.address, amount)
-    acceptable_dust = 1e10
-    assert pickleJar.balanceOf(eth_whale) - prev_pickle_balance > 0
-    assert zap.balance() < acceptable_dust
-    assert crv.balanceOf(zap) < acceptable_dust
-    assert sushiLPs.balanceOf(zap) < acceptable_dust
-    assert yveCrv.balanceOf(zap) < acceptable_dust
-    assert pickleJar.balanceOf(zap) < acceptable_dust
-    prev_pickle_balance = pickleJar.balanceOf(eth_whale)
-
-    # Deposit 10 ETH
-    amount = 1e19
-    eth_whale.transfer(zap.address, amount)
-    acceptable_dust = 1e10
-    assert pickleJar.balanceOf(eth_whale) - prev_pickle_balance > 0
-    assert zap.balance() < acceptable_dust
-    assert crv.balanceOf(zap) < acceptable_dust
-    assert sushiLPs.balanceOf(zap) < acceptable_dust
-    assert yveCrv.balanceOf(zap) < acceptable_dust
-    assert pickleJar.balanceOf(zap) < acceptable_dust
-    prev_pickle_balance = pickleJar.balanceOf(eth_whale)
-
-    # Deposit 100 ETH
-    amount = 1e20
-    eth_whale.transfer(zap.address, amount)
-    acceptable_dust = 1e10
-    assert pickleJar.balanceOf(eth_whale) - prev_pickle_balance > 0
-    assert zap.balance() < acceptable_dust
-    assert crv.balanceOf(zap) < acceptable_dust
-    assert sushiLPs.balanceOf(zap) < acceptable_dust
-    assert yveCrv.balanceOf(zap) < acceptable_dust
-    assert pickleJar.balanceOf(zap) < acceptable_dust
-    prev_pickle_balance = pickleJar.balanceOf(eth_whale)
-
-    # Deposit 1000 ETH
-    amount = 1e21
-    eth_whale.transfer(zap.address, amount)
-    acceptable_dust = 1e10
-    assert pickleJar.balanceOf(eth_whale) - prev_pickle_balance > 0
-    assert zap.balance() < acceptable_dust
-    assert crv.balanceOf(zap) < acceptable_dust
-    assert sushiLPs.balanceOf(zap) < acceptable_dust
-    assert yveCrv.balanceOf(zap) < acceptable_dust
-    assert pickleJar.balanceOf(zap) < acceptable_dust
-    prev_pickle_balance = pickleJar.balanceOf(eth_whale)
-
-def test_zap_crv(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale, swapPair, crv_whale, interface):
+def test_zap_crv_swap(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale, swapPair, crv_whale, interface):
     crv.approve(zap, 5e28, {"from":crv_whale})
 
+    """
+        CRV Part: 1
+        Currently, it is more economical to swap for yveCRV than to mint it
+        directly via the vault. This first set of tests will increasingly move the price
+        of CRV up until it becomes more efficient to mint yveCRV via the vault.
+    """
+
     # Zap 0.5
-    zap.zapIn(5e17, {"from":crv_whale})
+    zap.zapIn(1e12, {"from":crv_whale})
     acceptable_dust = 1e12
     assert pickleJar.balanceOf(crv_whale) > 0
     assert zap.balance() < acceptable_dust
@@ -152,3 +86,69 @@ def test_zap_crv(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale, swa
     assert sushiLPs.balanceOf(zap) < acceptable_dust
     assert yveCrv.balanceOf(zap) < acceptable_dust
     assert pickleJar.balanceOf(zap) < acceptable_dust
+
+    #zapBalances(zap, crv, crv_whale, eth_whale, pickleJar, sushiLPs, yveCrv)
+
+def test_zap_crv_vault(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale, swapPair, crv_whale, interface):
+    crv.approve(zap, 5e28, {"from":crv_whale})
+
+    """
+        CRV Part: 2
+        The remainder of these CRV tests should be routed
+        through the vault due to the previous tests raising
+        the price of CRV against ETH.
+    """
+
+    # Zap 500,000
+    zap.zapIn(5e23, {"from":crv_whale})
+    acceptable_dust = 1e12
+    assert pickleJar.balanceOf(crv_whale) > 0
+    assert zap.balance() < acceptable_dust
+    assert crv.balanceOf(zap) < acceptable_dust
+    assert sushiLPs.balanceOf(zap) < acceptable_dust
+    assert yveCrv.balanceOf(zap) < acceptable_dust
+    assert pickleJar.balanceOf(zap) < acceptable_dust
+    prev_pickle_balance = pickleJar.balanceOf(crv_whale)
+
+    # Zap 5
+    zap.zapIn(5e18, {"from":crv_whale})
+    acceptable_dust = 1e12
+    assert pickleJar.balanceOf(crv_whale) - prev_pickle_balance > 0
+    assert zap.balance() < acceptable_dust
+    assert crv.balanceOf(zap) < acceptable_dust
+    assert sushiLPs.balanceOf(zap) < acceptable_dust
+    assert yveCrv.balanceOf(zap) < acceptable_dust
+    assert pickleJar.balanceOf(zap) < acceptable_dust
+
+    # Zap 50
+    zap.zapIn(5e19, {"from":crv_whale})
+    acceptable_dust = 1e12
+    assert pickleJar.balanceOf(crv_whale) - prev_pickle_balance > 0
+    assert zap.balance() < acceptable_dust
+    assert crv.balanceOf(zap) < acceptable_dust
+    assert sushiLPs.balanceOf(zap) < acceptable_dust
+    assert yveCrv.balanceOf(zap) < acceptable_dust
+    assert pickleJar.balanceOf(zap) < acceptable_dust
+
+    # Zap 500
+    zap.zapIn(5e20, {"from":crv_whale})
+    acceptable_dust = 1e12
+    assert pickleJar.balanceOf(crv_whale) - prev_pickle_balance > 0
+    assert zap.balance() < acceptable_dust
+    assert crv.balanceOf(zap) < acceptable_dust
+    assert sushiLPs.balanceOf(zap) < acceptable_dust
+    assert yveCrv.balanceOf(zap) < acceptable_dust
+    assert pickleJar.balanceOf(zap) < acceptable_dust
+
+    # Zap 5,000
+    zap.zapIn(5e21, {"from":crv_whale})
+    acceptable_dust = 1e12
+    assert pickleJar.balanceOf(crv_whale) - prev_pickle_balance > 0
+    assert zap.balance() < acceptable_dust
+    assert crv.balanceOf(zap) < acceptable_dust
+    assert sushiLPs.balanceOf(zap) < acceptable_dust
+    assert yveCrv.balanceOf(zap) < acceptable_dust
+    assert pickleJar.balanceOf(zap) < acceptable_dust
+
+    #zapBalances(zap, crv, crv_whale, eth_whale, pickleJar, sushiLPs, yveCrv)
+

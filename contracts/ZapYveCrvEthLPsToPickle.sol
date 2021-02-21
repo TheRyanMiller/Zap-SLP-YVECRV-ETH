@@ -53,6 +53,7 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
     // Dex swap paths
     address[] public swapEthPath;
     address[] public swapCrvPath;
+    address[] public swapForYveCrvPath;
 
     // Misc
     bool private reEntry = false;
@@ -80,6 +81,10 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         swapCrvPath = new address[](2);
         swapCrvPath[0] = crv;
         swapCrvPath[1] = weth;
+
+        swapForYveCrvPath = new address[](2);
+        swapForYveCrvPath[0] = weth;
+        swapForYveCrvPath[1] = yveCrv;
     }
 
     function setGovernance(address _governance) external onlyGovernance {
@@ -88,7 +93,7 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
 
     /*  ETH Zap  */
     receive() external payable {
-        // Allow ETH to be sent in from DEX routers, but reject for all others when reEntry = true
+        // When reEntry = trueAllow, only allow ETH from DEX routers
         if (reEntry && msg.sender != activeDex && msg.sender != sushiswapRouter) {
             require(msg.value == 0, "No re-entrancy!");
         }
@@ -98,7 +103,7 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         }
     }
 
-    /*  CRV Zap  */
+    /*  CRV Zap  (denominated in wei) */
     function zapIn(uint256 crvAmount) external payable {
         require(crvAmount != 0, "0 CRV");
         require(msg.value == 0, "Single sided zaps only");
@@ -111,22 +116,33 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
     }
 
     function _zapIn(bool _isEth, uint256 _haveAmount) internal returns (uint256) {
+        IUniswapV2Pair lpPair = IUniswapV2Pair(ethYveCrv); // Pair we LP against
+        (uint112 lpReserveA, uint112 lpReserveB, ) = lpPair.getReserves();
 
-        //  Step 1: Calculate amount to swap        
-        uint256 amountToSwap = calculateSwapAmount(_haveAmount, _isEth);
+        //  Check if it's worthwhile to use the Yearn yveCRV vault
+        bool useVault = shouldUseVault(lpReserveA, lpReserveB);  
+        if(useVault){
+            // Calculate swap amount. God bless anyone who has to review that calculation function.
+            uint256 amountToSwap = calculateSwapAmount(_isEth, _haveAmount);
+            _tokenSwap(amountToSwap, _isEth);
+            yVault.depositAll();
+        }
+        else if(!_isEth){
+            // User sent CRV: Must convert all CRV to ETH first
+            IUniswapV2Router02(sushiswapRouter).swapExactTokensForETH(_haveAmount, 0, swapCrvPath, address(this), now);
+        }
+        if(!useVault){
+            // We can assume we have a full ETH balance now, time to swap for a the right amount of yveCRV for a single-sided deposit
+            int256 amountToSell = calculateSingleSided(lpReserveA, address(this).balance);
+            swapRouter.swapExactETHForTokens{value: uint256(amountToSell)}(1, swapForYveCrvPath, address(this), now)[swapEthPath.length - 1];
+        }
         
-        //  Step 2: Swap token
-        _tokenSwap(amountToSwap, _isEth);
-        
-        //  Step 3: Deposit CRV into yveCrv and receieve yveCRV tokens
-        yVault.depositAll();
-        
-        //  Step 4: Add liquidity to the Sushi ETH/yveCrv pair
+        //  Now we should have proper vaules. Time to provide some liquidity for the degens!
         IUniswapV2Router02(sushiswapRouter).addLiquidityETH{value: address(this).balance}( 
             yveCrv, yVault.balanceOf(address(this)), 1, 1, address(this), now
         );
        
-        //  Step 5: Deposit LP tokens to Pickle jar and send tokens back to user
+        //  Deposit LP tokens to Pickle jar and send tokens back to user
         pickleJar.depositAll();
         IERC20(address(pickleJar)).safeTransfer(msg.sender, pickleJar.balanceOf(address(this)));
         
@@ -165,7 +181,27 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         }
     }
 
-    function calculateSwapAmount(uint256 _haveAmount, bool _isEth) internal view returns (uint256) {
+    function shouldUseVault(uint256 lpReserveA, uint256 lpReserveB) internal returns (bool) {
+        uint256 safetyFactor = 1e5; // For extra precision
+        // Get asset ratio of swap pair
+        IUniswapV2Pair pair = IUniswapV2Pair(swapPair); // Pair we might want to swap against
+        (uint256 reserveA, uint256 reserveB, ) = pair.getReserves();
+        uint256 pool1ratio = reserveB.mul(safetyFactor).div(reserveA);
+        // Get asset ratio of LP pair
+        uint256 pool2ratio = lpReserveB.mul(safetyFactor).div(lpReserveA);
+
+        return pool1ratio > pool2ratio; // Use vault only if pool 2 offers a better price
+    }
+
+    function calculateSingleSided(uint256 reserveIn, uint256 userIn) internal pure returns (int256) {
+        int256 num = 1994;
+        return
+            Babylonian.sqrt(
+                int256(reserveIn).mul(int256(userIn).mul(3988000) + int256(reserveIn).mul(3988009))
+            ).sub(int256(reserveIn).mul(1997)) / 1994;
+    }
+
+    function calculateSwapAmount(bool _isEth, uint256 _haveAmount) internal view returns (uint256) {
         IUniswapV2Pair pair = IUniswapV2Pair(swapPair); // Pair we swap against
         (uint256 reserveA, uint256 reserveB, ) = pair.getReserves();
         int256 pool1HaveReserve = 0;
@@ -181,10 +217,9 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
             pool1HaveReserve = int256(reserveB);
             pool1WantReserve = int256(reserveA);
         }
-
-        pair = IUniswapV2Pair(ethYveCrv); // Pair we LP against
-        (reserveA, reserveB, ) = pair.getReserves();
         
+        pair = IUniswapV2Pair(ethYveCrv); // Pair we swap against
+        (reserveA, reserveB, ) = pair.getReserves();
         if(_isEth){
             ra = int256(reserveB);
             rb = int256(reserveA);
@@ -194,12 +229,14 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
             rb = int256(reserveB);
         }
         
-        int256 numToSquare = int256(_haveAmount).mul(997).add(pool1HaveReserve.mul(1000)); // We'll need this later
+        int256 numToSquare = int256(_haveAmount).mul(997);
+        numToSquare = numToSquare.add(pool1HaveReserve.mul(1000)); // We'll need this later
         int256 FACTOR = 1e20; // To help with precision
 
         // LINE 1
+        int256 h = int256(_haveAmount); // re-assert this or else stack will get too deep and forget it
         int256 a = pool1WantReserve.mul(-1994).mul(ra).div(rb);
-        int256 b = int256(_haveAmount).mul(997);
+        int256 b = h.mul(997);
         b = b.sub(pool1HaveReserve.mul(1000));
         b = a.mul(b);
 
@@ -211,12 +248,11 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         a = b.add(a); // Add result to total
         
         // LINE 3
-        int256 h = int256(_haveAmount);
         int256 r = pool1WantReserve.mul(pool1WantReserve);
         r = r.mul(994009);
         a = a.add(r); // Add result to total
         
-        // Sqaure the total
+        // Sqaure what we have so far
         int256 sq = Babylonian.sqrt(a);
         
         // LINE 4
