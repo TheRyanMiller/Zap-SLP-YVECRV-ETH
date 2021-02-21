@@ -13,7 +13,7 @@ def test_zap_crv_swap(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale
     """
 
     # Zap 0.5
-    zap.zapIn(1e12, {"from":crv_whale})
+    zap.zapInCRV(1e17, {"from":crv_whale})
     acceptable_dust = 1e12
     assert pickleJar.balanceOf(crv_whale) > 0
     assert zap.balance() < acceptable_dust
@@ -24,7 +24,7 @@ def test_zap_crv_swap(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale
     prev_pickle_balance = pickleJar.balanceOf(crv_whale)
 
     # Zap 5
-    zap.zapIn(5e18, {"from":crv_whale})
+    zap.zapInCRV(5e18, {"from":crv_whale})
     acceptable_dust = 1e12
     assert pickleJar.balanceOf(crv_whale) - prev_pickle_balance > 0
     assert zap.balance() < acceptable_dust
@@ -35,7 +35,7 @@ def test_zap_crv_swap(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale
     prev_pickle_balance = pickleJar.balanceOf(crv_whale)
 
     # Zap 50
-    zap.zapIn(5e19, {"from":crv_whale})
+    zap.zapInCRV(5e19, {"from":crv_whale})
     acceptable_dust = 1e12 
     assert pickleJar.balanceOf(crv_whale) - prev_pickle_balance > 0
     assert zap.balance() < acceptable_dust
@@ -46,7 +46,7 @@ def test_zap_crv_swap(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale
     prev_pickle_balance = pickleJar.balanceOf(crv_whale)
     
     # Zap 500
-    zap.zapIn(5e20, {"from":crv_whale})
+    zap.zapInCRV(5e20, {"from":crv_whale})
     acceptable_dust = 1e12
     assert pickleJar.balanceOf(crv_whale) - prev_pickle_balance > 0
     assert zap.balance() < acceptable_dust
@@ -57,7 +57,7 @@ def test_zap_crv_swap(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale
     prev_pickle_balance = pickleJar.balanceOf(crv_whale)
 
     # Zap 5,000
-    zap.zapIn(5e21, {"from":crv_whale})
+    zap.zapInCRV(5e21, {"from":crv_whale})
     acceptable_dust = 1e12
     assert pickleJar.balanceOf(crv_whale) - prev_pickle_balance > 0
     assert zap.balance() < acceptable_dust
@@ -67,7 +67,7 @@ def test_zap_crv_swap(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale
     assert pickleJar.balanceOf(zap) < acceptable_dust
 
     # Zap 50,000
-    zap.zapIn(5e22, {"from":crv_whale})
+    zap.zapInCRV(5e22, {"from":crv_whale})
     acceptable_dust = 1e12
     assert pickleJar.balanceOf(crv_whale) - prev_pickle_balance > 0
     assert zap.balance() < acceptable_dust
@@ -78,7 +78,7 @@ def test_zap_crv_swap(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale
     prev_pickle_balance = pickleJar.balanceOf(crv_whale)
 
     # Zap 500,000
-    zap.zapIn(5e23, {"from":crv_whale})
+    zap.zapInCRV(5e23, {"from":crv_whale})
     acceptable_dust = 1e12
     assert pickleJar.balanceOf(crv_whale) - prev_pickle_balance > 0
     assert zap.balance() < acceptable_dust
@@ -100,7 +100,7 @@ def test_zap_crv_vault(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whal
     """
 
     # Zap 500,000
-    zap.zapIn(5e23, {"from":crv_whale})
+    zap.zapInCRV(5e23, {"from":crv_whale})
     acceptable_dust = 1e12
     assert pickleJar.balanceOf(crv_whale) > 0
     assert zap.balance() < acceptable_dust
@@ -111,7 +111,7 @@ def test_zap_crv_vault(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whal
     prev_pickle_balance = pickleJar.balanceOf(crv_whale)
 
     # Zap 5
-    zap.zapIn(5e18, {"from":crv_whale})
+    zap.zapInCRV(5e18, {"from":crv_whale})
     acceptable_dust = 1e12
     assert pickleJar.balanceOf(crv_whale) - prev_pickle_balance > 0
     assert zap.balance() < acceptable_dust
@@ -121,7 +121,7 @@ def test_zap_crv_vault(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whal
     assert pickleJar.balanceOf(zap) < acceptable_dust
 
     # Zap 50
-    zap.zapIn(5e19, {"from":crv_whale})
+    zap.zapInCRV(5e19, {"from":crv_whale})
     acceptable_dust = 1e12
     assert pickleJar.balanceOf(crv_whale) - prev_pickle_balance > 0
     assert zap.balance() < acceptable_dust
@@ -131,7 +131,7 @@ def test_zap_crv_vault(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whal
     assert pickleJar.balanceOf(zap) < acceptable_dust
 
     # Zap 500
-    zap.zapIn(5e20, {"from":crv_whale})
+    zap.zapInCRV(5e20, {"from":crv_whale})
     acceptable_dust = 1e12
     assert pickleJar.balanceOf(crv_whale) - prev_pickle_balance > 0
     assert zap.balance() < acceptable_dust
@@ -141,7 +141,7 @@ def test_zap_crv_vault(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whal
     assert pickleJar.balanceOf(zap) < acceptable_dust
 
     # Zap 5,000
-    zap.zapIn(5e21, {"from":crv_whale})
+    zap.zapInCRV(5e21, {"from":crv_whale})
     acceptable_dust = 1e12
     assert pickleJar.balanceOf(crv_whale) - prev_pickle_balance > 0
     assert zap.balance() < acceptable_dust

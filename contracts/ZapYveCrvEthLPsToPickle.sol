@@ -91,8 +91,16 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         governance = _governance;
     }
 
-    /*  ETH Zap  */
+    // Here we allow receipt of ETH from our DEX
     receive() external payable {
+        // When reEntry = trueAllow, only allow ETH from DEX routers
+        if (reEntry && msg.sender != activeDex && msg.sender != sushiswapRouter) {
+            require(msg.value == 0, "No re-entrancy!");
+        }
+    }
+
+    /*  ETH Zap  */
+    function zapInETH() external payable {
         // When reEntry = trueAllow, only allow ETH from DEX routers
         if (reEntry && msg.sender != activeDex && msg.sender != sushiswapRouter) {
             require(msg.value == 0, "No re-entrancy!");
@@ -104,9 +112,8 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
     }
 
     /*  CRV Zap  (denominated in wei) */
-    function zapIn(uint256 crvAmount) external payable {
+    function zapInCRV(uint256 crvAmount) external {
         require(crvAmount != 0, "0 CRV");
-        require(msg.value == 0, "Single sided zaps only");
         if (reEntry) {
             return;
         }
@@ -181,7 +188,7 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         }
     }
 
-    function shouldUseVault(uint256 lpReserveA, uint256 lpReserveB) internal returns (bool) {
+    function shouldUseVault(uint256 lpReserveA, uint256 lpReserveB) internal view returns (bool) {
         uint256 safetyFactor = 1e5; // For extra precision
         // Get asset ratio of swap pair
         IUniswapV2Pair pair = IUniswapV2Pair(swapPair); // Pair we might want to swap against
@@ -194,7 +201,6 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
     }
 
     function calculateSingleSided(uint256 reserveIn, uint256 userIn) internal pure returns (int256) {
-        int256 num = 1994;
         return
             Babylonian.sqrt(
                 int256(reserveIn).mul(int256(userIn).mul(3988000) + int256(reserveIn).mul(3988009))
