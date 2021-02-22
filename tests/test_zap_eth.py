@@ -2,7 +2,7 @@ from brownie import Wei
 from helpers import zapBalances
 from datetime import datetime
 
-def test_zap_eth_swap(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale, swapPair, crv_whale, interface):
+def test_zap_eth_swap(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale, swapPair, crv_whale, interface, pickleStake):
     
     """
         ETH Part: 1
@@ -84,9 +84,9 @@ def test_zap_eth_swap(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale
     assert pickleJar.balanceOf(zap) < acceptable_dust
     prev_pickle_balance = pickleJar.balanceOf(eth_whale)
 
-    # zapBalances(zap, crv, crv_whale, eth_whale, pickleJar, sushiLPs, yveCrv)
+    zapBalances(zap, crv, crv_whale, eth_whale, pickleJar, sushiLPs, yveCrv, pickleStake)
 
-def test_zap_eth_vault(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale, swapPair, crv_whale, interface):
+def test_zap_eth_vault(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale, swapPair, crv_whale, interface, pickleStake):
     """
         ETH Part: 2
         The remainder of these ETH tests should be routed

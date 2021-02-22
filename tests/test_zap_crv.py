@@ -2,7 +2,7 @@ from brownie import Wei
 from helpers import zapBalances
 from datetime import datetime
 
-def test_zap_crv_swap(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale, swapPair, crv_whale, interface):
+def test_zap_crv_swap(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale, swapPair, crv_whale, interface, pickleStake):
     crv.approve(zap, 5e28, {"from":crv_whale})
 
     """
@@ -89,7 +89,7 @@ def test_zap_crv_swap(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale
 
     #zapBalances(zap, crv, crv_whale, eth_whale, pickleJar, sushiLPs, yveCrv)
 
-def test_zap_crv_vault(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale, swapPair, crv_whale, interface):
+def test_zap_crv_vault(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale, swapPair, crv_whale, interface, pickleStake):
     crv.approve(zap, 5e28, {"from":crv_whale})
 
     """
@@ -150,5 +150,5 @@ def test_zap_crv_vault(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whal
     assert yveCrv.balanceOf(zap) < acceptable_dust
     assert pickleJar.balanceOf(zap) < acceptable_dust
 
-    #zapBalances(zap, crv, crv_whale, eth_whale, pickleJar, sushiLPs, yveCrv)
+    zapBalances(zap, crv, crv_whale, eth_whale, pickleJar, sushiLPs, yveCrv, pickleStake)
 

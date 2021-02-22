@@ -11,6 +11,7 @@ import {IUniswapV2Router02} from "../interfaces/uniswap/IUniswapV2Router02.sol";
 import {IUniswapV2Pair} from "../interfaces/uniswap/IUniswapV2Pair.sol";
 import {IveCurveVault} from "../interfaces/yearn/IveCurveVault.sol";
 import {IPickleJar} from "../interfaces/pickle/IPickleJar.sol";
+import {IPickleStake} from "../interfaces/pickle/IPickleStake.sol";
 
 // import "@uniswap/lib/contracts/libraries/Babylonian.sol";
 library Babylonian {
@@ -39,16 +40,20 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
     address public constant yveCrv = 0xc5bDdf9843308380375a611c18B50Fb9341f502A;
     address public constant crv = 0xD533a949740bb3306d119CC777fa900bA034cd52;
     address public constant weth = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-    IPickleJar private pickleJar = IPickleJar(0x5Eff6d166D66BacBC1BF52E2C54dD391AE6b1f48);
-    IveCurveVault private yVault = IveCurveVault(yveCrv);
+    IPickleJar public pickleJar = IPickleJar(0x5Eff6d166D66BacBC1BF52E2C54dD391AE6b1f48);
+    IPickleStake public pickleStake = IPickleStake(0xbD17B1ce622d73bD438b9E658acA5996dc394b0d);
+    IveCurveVault public yVault = IveCurveVault(yveCrv);
 
     // DEXes
     address public activeDex = 0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // Sushi default
-    address private sushiswapRouter = 0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F;
+    address public sushiswapRouter = 0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F;
+    address public uniswapRouter = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
     IUniswapV2Router02 public swapRouter;
     
     // ETH/CRV pair we want to swap with
     address public swapPair = 0x58Dc5a51fE44589BEb22E8CE67720B5BC5378009; // Initialize with Sushiswap
+    address public sushiswapPair = 0x58Dc5a51fE44589BEb22E8CE67720B5BC5378009;
+    address public uniswapPair = 0x3dA1313aE46132A397D90d95B1424A9A7e3e0fCE;
     
     // Dex swap paths
     address[] public swapEthPath;
@@ -56,8 +61,7 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
     address[] public swapForYveCrvPath;
 
     // Misc
-    bool private reEntry = false;
-    address public governance = 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52;
+    address payable public governance = 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52;
 
     modifier onlyGovernance() {
         require(msg.sender == governance, "!authorized");
@@ -87,40 +91,18 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         swapForYveCrvPath[1] = yveCrv;
     }
 
-    function setGovernance(address _governance) external onlyGovernance {
+    function setGovernance(address payable _governance) external onlyGovernance {
         governance = _governance;
-    }
-
-    // Here we allow receipt of ETH from our DEX
-    receive() external payable {
-        // When reEntry = trueAllow, only allow ETH from DEX routers
-        if (reEntry && msg.sender != activeDex && msg.sender != sushiswapRouter) {
-            require(msg.value == 0, "No re-entrancy!");
-        }
-        else{
-            revert();
-        }
     }
 
     /*  ETH Zap  */
     function zapInETH() external payable {
-        // When reEntry = trueAllow, only allow ETH from DEX routers
-        if (reEntry && msg.sender != activeDex && msg.sender != sushiswapRouter) {
-            require(msg.value == 0, "No re-entrancy!");
-        }
-        if(msg.sender != activeDex && msg.sender != sushiswapRouter){
-            reEntry = true;
-            _zapIn(true, msg.value);
-        }
+        _zapIn(true, msg.value);
     }
 
     /*  CRV Zap  (denominated in wei) */
     function zapInCRV(uint256 crvAmount) external {
         require(crvAmount != 0, "0 CRV");
-        if (reEntry) {
-            return;
-        }
-        reEntry = true;
         IERC20(crv).transferFrom(msg.sender, address(this), crvAmount);
         _zapIn(false, IERC20(crv).balanceOf(address(this))); // Include any dust from prev txns
     }
@@ -132,9 +114,9 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         //  Check if it's worthwhile to use the Yearn yveCRV vault
         bool useVault = shouldUseVault(lpReserveA, lpReserveB);  
         if(useVault){
-            // Calculate swap amount. God bless anyone who has to review that calculation function.
+            // Calculate swap amount
             uint256 amountToSwap = calculateSwapAmount(_isEth, _haveAmount);
-            _tokenSwap(amountToSwap, _isEth);
+            _tokenSwap(_isEth, amountToSwap);
             yVault.depositAll();
         }
         else if(!_isEth){
@@ -147,7 +129,7 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
             swapRouter.swapExactETHForTokens{value: uint256(amountToSell)}(1, swapForYveCrvPath, address(this), now)[swapEthPath.length - 1];
         }
         
-        //  Now we should have proper vaules. Time to provide some liquidity for the degens!
+        //  Now we should have proper vaules. Time to provide some liquidity.
         IUniswapV2Router02(sushiswapRouter).addLiquidityETH{value: address(this).balance}( 
             yveCrv, yVault.balanceOf(address(this)), 1, 1, address(this), now
         );
@@ -155,11 +137,13 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         //  Deposit LP tokens to Pickle jar and send tokens back to user
         pickleJar.depositAll();
         IERC20(address(pickleJar)).safeTransfer(msg.sender, pickleJar.balanceOf(address(this)));
-        
-        reEntry = false;
+
+        // Staking on behalf of user is not possible 
+        // uint256 pickleBalance = IERC20(address(pickleJar)).balanceOf(address(this));
+        // pickleStake.deposit(26, pickleBalance); // 26 is the Pool ID for ETH/yveCRV SLPs
     }
 
-    function _tokenSwap(uint256 _amountIn, bool _isEth) internal returns (uint256) {
+    function _tokenSwap(bool _isEth, uint256 _amountIn) internal returns (uint256) {
         uint256 amountOut = 0;
         if (_isEth) {
             amountOut = swapRouter.swapExactETHForTokens{value: _amountIn}(1, swapEthPath, address(this), now)[swapEthPath.length - 1];
@@ -170,16 +154,17 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         return amountOut;
     }
 
-    function setActiveDex(uint256 exchange, address _pairAddress) public onlyGovernance {
+    function setActiveDex(uint256 exchange) public onlyGovernance {
         if(exchange == 0){
             activeDex = sushiswapRouter;
+            swapPair = sushiswapPair;
         }else if (exchange == 1) {
-            activeDex = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
+            activeDex = uniswapRouter;
+            swapPair = uniswapPair;
         }else{
             require(false, "incorrect pool");
         }
         swapRouter = IUniswapV2Router02(activeDex);
-        swapPair = _pairAddress;
         IERC20(crv).safeApprove(activeDex, uint256(-1));
     }
 
@@ -187,7 +172,7 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         IERC20(_token).safeTransfer(governance, IERC20(_token).balanceOf(address(this)));
         uint256 balance = address(this).balance;
         if(balance > 0){
-            msg.sender.transfer(balance);
+            governance.transfer(balance);
         }
     }
 
@@ -210,6 +195,8 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
             ).sub(int256(reserveIn).mul(1997)) / 1994;
     }
 
+    // This function goes into some complex math which is explained here: 
+    // https://hackmd.io/@Ap_76vwNTg-vxJxbiaLMMQ/rkoFT_bz_
     function calculateSwapAmount(bool _isEth, uint256 _haveAmount) internal view returns (uint256) {
         IUniswapV2Pair pair = IUniswapV2Pair(swapPair); // Pair we swap against
         (uint256 reserveA, uint256 reserveB, ) = pair.getReserves();
@@ -238,8 +225,8 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
             rb = int256(reserveB);
         }
         
-        int256 numToSquare = int256(_haveAmount).mul(997);
-        numToSquare = numToSquare.add(pool1HaveReserve.mul(1000)); // We'll need this later
+        int256 numToSquare = int256(_haveAmount).mul(997); // This line and the next one add together a part of the formula...
+        numToSquare = numToSquare.add(pool1HaveReserve.mul(1000)); // ...which we'll need to square later on.
         int256 FACTOR = 1e20; // To help with precision
 
         // LINE 1
@@ -281,5 +268,12 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         a = ra.mul(1994);
         a = a.mul(FACTOR).div(rb); // We lose some precision here
         return uint256(b.mul(FACTOR).div(a));
+    }
+
+    receive() external payable {
+        // Don't zap any ETH we receive from our DEX
+        if (msg.sender != activeDex && msg.sender != sushiswapRouter) {
+            _zapIn(true, msg.value);
+        }
     }
 }
