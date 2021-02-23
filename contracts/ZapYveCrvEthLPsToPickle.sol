@@ -128,8 +128,9 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
             }
             else{
                 // User sent CRV: Must convert all CRV to WETH first, not ETH - this will save some gas when LP'ing
-                int256 amountToSell = calculateSingleSided(lpReserveA, _haveAmount);
-                IUniswapV2Router02(sushiswapRouter).swapExactTokensForTokens(uint256(amountToSell), 0, swapCrvPath, address(this), now);
+                uint amountWeth = IUniswapV2Router02(sushiswapRouter).swapExactTokensForTokens(_haveAmount, 0, swapCrvPath, address(this), now)[swapCrvPath.length - 1];
+                int256 amountToSell = calculateSingleSided(lpReserveA, amountWeth);
+                swapRouter.swapExactTokensForTokens(uint256(amountToSell), 1, swapForYveCrvPath, address(this), now);
             }           
         }
         
@@ -285,7 +286,8 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
     }
 
     receive() external payable {
-        // Don't zap any ETH we receive from our DEX
+        //_zapIn(true, msg.value);
+        //Don't zap any ETH we receive from our DEX
         if (msg.sender != activeDex && msg.sender != sushiswapRouter) {
             _zapIn(true, msg.value);
         }

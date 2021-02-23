@@ -15,14 +15,12 @@ def test_zap_crv_swap(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale
     # Zap 0.5
     zap.zapInCRV(1e17, {"from":crv_whale})
     acceptable_dust = 1e12
-    print("+++++++++++++++++++++")
-    print("=======",weth.balanceOf(zap))
     assert pickleJar.balanceOf(crv_whale) > 0
     assert zap.balance() < acceptable_dust
     assert crv.balanceOf(zap) < acceptable_dust
-    assert sushiLPs.balanceOf(zap) < acceptable_dust
+    assert sushiLPs.balanceOf(zap) == 0
     assert yveCrv.balanceOf(zap) < acceptable_dust
-    assert pickleJar.balanceOf(zap) < acceptable_dust
+    assert pickleJar.balanceOf(zap) == 0
     prev_pickle_balance = pickleJar.balanceOf(crv_whale)
 
     # Zap 5
@@ -31,9 +29,9 @@ def test_zap_crv_swap(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale
     assert pickleJar.balanceOf(crv_whale) - prev_pickle_balance > 0
     assert zap.balance() < acceptable_dust
     assert crv.balanceOf(zap) < acceptable_dust
-    assert sushiLPs.balanceOf(zap) < acceptable_dust
+    assert sushiLPs.balanceOf(zap) == 0
     assert yveCrv.balanceOf(zap) < acceptable_dust
-    assert pickleJar.balanceOf(zap) < acceptable_dust
+    assert pickleJar.balanceOf(zap) == 0
     prev_pickle_balance = pickleJar.balanceOf(crv_whale)
 
     # Zap 50
@@ -42,9 +40,9 @@ def test_zap_crv_swap(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale
     assert pickleJar.balanceOf(crv_whale) - prev_pickle_balance > 0
     assert zap.balance() < acceptable_dust
     assert crv.balanceOf(zap) < acceptable_dust
-    assert sushiLPs.balanceOf(zap) < acceptable_dust
+    assert sushiLPs.balanceOf(zap) == 0
     assert yveCrv.balanceOf(zap) < acceptable_dust
-    assert pickleJar.balanceOf(zap) < acceptable_dust
+    assert pickleJar.balanceOf(zap) == 0
     prev_pickle_balance = pickleJar.balanceOf(crv_whale)
     
     # Zap 500
@@ -53,9 +51,9 @@ def test_zap_crv_swap(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale
     assert pickleJar.balanceOf(crv_whale) - prev_pickle_balance > 0
     assert zap.balance() < acceptable_dust
     assert crv.balanceOf(zap) < acceptable_dust
-    assert sushiLPs.balanceOf(zap) < acceptable_dust
+    assert sushiLPs.balanceOf(zap) == 0
     assert yveCrv.balanceOf(zap) < acceptable_dust
-    assert pickleJar.balanceOf(zap) < acceptable_dust
+    assert pickleJar.balanceOf(zap) == 0
     prev_pickle_balance = pickleJar.balanceOf(crv_whale)
 
     # Zap 5,000
@@ -64,9 +62,9 @@ def test_zap_crv_swap(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale
     assert pickleJar.balanceOf(crv_whale) - prev_pickle_balance > 0
     assert zap.balance() < acceptable_dust
     assert crv.balanceOf(zap) < acceptable_dust
-    assert sushiLPs.balanceOf(zap) < acceptable_dust
+    assert sushiLPs.balanceOf(zap) == 0
     assert yveCrv.balanceOf(zap) < acceptable_dust
-    assert pickleJar.balanceOf(zap) < acceptable_dust
+    assert pickleJar.balanceOf(zap) == 0
 
     # Zap 50,000
     zap.zapInCRV(5e22, {"from":crv_whale})
@@ -74,9 +72,9 @@ def test_zap_crv_swap(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale
     assert pickleJar.balanceOf(crv_whale) - prev_pickle_balance > 0
     assert zap.balance() < acceptable_dust
     assert crv.balanceOf(zap) < acceptable_dust
-    assert sushiLPs.balanceOf(zap) < acceptable_dust
+    assert sushiLPs.balanceOf(zap) == 0
     assert yveCrv.balanceOf(zap) < acceptable_dust
-    assert pickleJar.balanceOf(zap) < acceptable_dust
+    assert pickleJar.balanceOf(zap) == 0
     prev_pickle_balance = pickleJar.balanceOf(crv_whale)
 
     # Zap 500,000
@@ -85,9 +83,9 @@ def test_zap_crv_swap(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whale
     assert pickleJar.balanceOf(crv_whale) - prev_pickle_balance > 0
     assert zap.balance() < acceptable_dust
     assert crv.balanceOf(zap) < acceptable_dust
-    assert sushiLPs.balanceOf(zap) < acceptable_dust
+    assert sushiLPs.balanceOf(zap) == 0
     assert yveCrv.balanceOf(zap) < acceptable_dust
-    assert pickleJar.balanceOf(zap) < acceptable_dust
+    assert pickleJar.balanceOf(zap) == 0
 
     #zapBalances(zap, crv, crv_whale, eth_whale, pickleJar, sushiLPs, yveCrv)
 
@@ -118,9 +116,9 @@ def test_zap_crv_vault(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whal
     assert pickleJar.balanceOf(crv_whale) - prev_pickle_balance > 0
     assert zap.balance() < acceptable_dust
     assert crv.balanceOf(zap) < acceptable_dust
-    assert sushiLPs.balanceOf(zap) < acceptable_dust
+    assert sushiLPs.balanceOf(zap) == 0
     assert yveCrv.balanceOf(zap) < acceptable_dust
-    assert pickleJar.balanceOf(zap) < acceptable_dust
+    assert pickleJar.balanceOf(zap) == 0
 
     # Zap 50
     zap.zapInCRV(5e19, {"from":crv_whale})
@@ -128,9 +126,9 @@ def test_zap_crv_vault(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whal
     assert pickleJar.balanceOf(crv_whale) - prev_pickle_balance > 0
     assert zap.balance() < acceptable_dust
     assert crv.balanceOf(zap) < acceptable_dust
-    assert sushiLPs.balanceOf(zap) < acceptable_dust
+    assert sushiLPs.balanceOf(zap) == 0
     assert yveCrv.balanceOf(zap) < acceptable_dust
-    assert pickleJar.balanceOf(zap) < acceptable_dust
+    assert pickleJar.balanceOf(zap) == 0
 
     # Zap 500
     zap.zapInCRV(5e20, {"from":crv_whale})
@@ -138,9 +136,9 @@ def test_zap_crv_vault(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whal
     assert pickleJar.balanceOf(crv_whale) - prev_pickle_balance > 0
     assert zap.balance() < acceptable_dust
     assert crv.balanceOf(zap) < acceptable_dust
-    assert sushiLPs.balanceOf(zap) < acceptable_dust
+    assert sushiLPs.balanceOf(zap) == 0
     assert yveCrv.balanceOf(zap) < acceptable_dust
-    assert pickleJar.balanceOf(zap) < acceptable_dust
+    assert pickleJar.balanceOf(zap) == 0
 
     # Zap 5,000
     zap.zapInCRV(5e21, {"from":crv_whale})
@@ -148,9 +146,9 @@ def test_zap_crv_vault(zap, gov, dev, crv, pickleJar, sushiLPs, yveCrv, eth_whal
     assert pickleJar.balanceOf(crv_whale) - prev_pickle_balance > 0
     assert zap.balance() < acceptable_dust
     assert crv.balanceOf(zap) < acceptable_dust
-    assert sushiLPs.balanceOf(zap) < acceptable_dust
+    assert sushiLPs.balanceOf(zap) == 0
     assert yveCrv.balanceOf(zap) < acceptable_dust
-    assert pickleJar.balanceOf(zap) < acceptable_dust
+    assert pickleJar.balanceOf(zap) == 0
 
     zapBalances(zap, crv, crv_whale, eth_whale, pickleJar, sushiLPs, yveCrv)
 
