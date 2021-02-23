@@ -24,10 +24,10 @@ def sushiLPs(interface):
 def pickleJar(interface):
     yield interface.ERC20("0x5Eff6d166D66BacBC1BF52E2C54dD391AE6b1f48")
 
-@pytest.fixture
-def pickleStake(interface):
-    #yield interface.IPickleStake("0xbD17B1ce622d73bD438b9E658acA5996dc394b0d")
-    yield Contract.from_explorer("0xbD17B1ce622d73bD438b9E658acA5996dc394b0d")
+# @pytest.fixture
+# def pickleStake(interface):
+#     #yield interface.IPickleStake("0xbD17B1ce622d73bD438b9E658acA5996dc394b0d")
+#     yield Contract.from_explorer("0xbD17B1ce622d73bD438b9E658acA5996dc394b0d")
 
 @pytest.fixture
 def swapPair(interface):

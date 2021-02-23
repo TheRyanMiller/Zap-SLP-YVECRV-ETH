@@ -11,7 +11,6 @@ import {IUniswapV2Router02} from "../interfaces/uniswap/IUniswapV2Router02.sol";
 import {IUniswapV2Pair} from "../interfaces/uniswap/IUniswapV2Pair.sol";
 import {IveCurveVault} from "../interfaces/yearn/IveCurveVault.sol";
 import {IPickleJar} from "../interfaces/pickle/IPickleJar.sol";
-import {IPickleStake} from "../interfaces/pickle/IPickleStake.sol";
 
 // import "@uniswap/lib/contracts/libraries/Babylonian.sol";
 library Babylonian {
@@ -41,7 +40,6 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
     address public constant crv = 0xD533a949740bb3306d119CC777fa900bA034cd52;
     address public constant weth = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     IPickleJar public pickleJar = IPickleJar(0x5Eff6d166D66BacBC1BF52E2C54dD391AE6b1f48);
-    IPickleStake public pickleStake = IPickleStake(0xbD17B1ce622d73bD438b9E658acA5996dc394b0d);
     IveCurveVault public yVault = IveCurveVault(yveCrv);
 
     // DEXes
@@ -74,6 +72,7 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
 
         // Setup some initial approvals
         IERC20(crv).safeApprove(activeDex, uint256(-1)); // For curve swaps on dex
+        IERC20(weth).safeApprove(activeDex, uint256(-1)); // For staking into pickle jar
         IERC20(crv).safeApprove(yveCrv, uint256(-1));// approve vault to take curve
         IERC20(yveCrv).safeApprove(sushiswapRouter, uint256(-1));
         IERC20(ethYveCrv).safeApprove(address(pickleJar), uint256(-1)); // For staking into pickle jar
@@ -112,33 +111,47 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         (uint112 lpReserveA, uint112 lpReserveB, ) = lpPair.getReserves();
 
         //  Check if it's worthwhile to use the Yearn yveCRV vault
-        bool useVault = shouldUseVault(lpReserveA, lpReserveB);  
+        bool useVault = shouldUseVault(lpReserveA, lpReserveB);
+
+        // Logic tree below is used to calculate swap amounts based on conditions: useVault and Zap token type
         if(useVault){
             // Calculate swap amount
             uint256 amountToSwap = calculateSwapAmount(_isEth, _haveAmount);
             _tokenSwap(_isEth, amountToSwap);
             yVault.depositAll();
         }
-        else if(!_isEth){
-            // User sent CRV: Must convert all CRV to ETH first
-            IUniswapV2Router02(sushiswapRouter).swapExactTokensForETH(_haveAmount, 0, swapCrvPath, address(this), now);
-        }
-        if(!useVault){
-            // We can assume we have a full ETH balance now, time to swap for a the right amount of yveCRV for a single-sided deposit
-            int256 amountToSell = calculateSingleSided(lpReserveA, address(this).balance);
-            swapRouter.swapExactETHForTokens{value: uint256(amountToSell)}(1, swapForYveCrvPath, address(this), now)[swapEthPath.length - 1];
+        else{
+            if(_isEth){
+                // Calculate the swap needed for the right amount of yveCRV for a single-sided deposit
+                int256 amountToSell = calculateSingleSided(lpReserveA, address(this).balance);
+                swapRouter.swapExactETHForTokens{value: uint256(amountToSell)}(1, swapForYveCrvPath, address(this), now);
+            }
+            else{
+                // User sent CRV: Must convert all CRV to WETH first, not ETH - this will save some gas when LP'ing
+                int256 amountToSell = calculateSingleSided(lpReserveA, _haveAmount);
+                IUniswapV2Router02(sushiswapRouter).swapExactTokensForTokens(uint256(amountToSell), 0, swapCrvPath, address(this), now);
+            }           
         }
         
-        //  Now we should have proper vaules. Time to provide some liquidity.
-        IUniswapV2Router02(sushiswapRouter).addLiquidityETH{value: address(this).balance}( 
-            yveCrv, yVault.balanceOf(address(this)), 1, 1, address(this), now
-        );
+        //  Add liquidity based on whether we're holding ETH or WETH
+        if(_isEth){
+            IUniswapV2Router02(sushiswapRouter).addLiquidityETH{value: address(this).balance}( 
+                yveCrv, yVault.balanceOf(address(this)), 1, 1, address(this), now
+            );
+        }
+        else{
+            //  CRV swaps don't handle native ETH, only WETH, so must use a different function
+            IUniswapV2Router02(sushiswapRouter).addLiquidity(    
+                //weth, yveCrv, IERC20(weth).balanceOf(address(this)), yVault.balanceOf(address(this)), 0, 0, address(this), now
+                yveCrv, weth, yVault.balanceOf(address(this)), IERC20(weth).balanceOf(address(this)), 0, 0, address(this), now
+            );
+        }
        
         //  Deposit LP tokens to Pickle jar and send tokens back to user
         pickleJar.depositAll();
         IERC20(address(pickleJar)).safeTransfer(msg.sender, pickleJar.balanceOf(address(this)));
 
-        // Staking on behalf of user is not possible 
+        // Staking pickle jar tokens on behalf of user is not possible because deposits cannot be made on behalf of another address
         // uint256 pickleBalance = IERC20(address(pickleJar)).balanceOf(address(this));
         // pickleStake.deposit(26, pickleBalance); // 26 is the Pool ID for ETH/yveCRV SLPs
     }
@@ -148,7 +161,8 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         if (_isEth) {
             amountOut = swapRouter.swapExactETHForTokens{value: _amountIn}(1, swapEthPath, address(this), now)[swapEthPath.length - 1];
         } else {
-            amountOut = swapRouter.swapExactTokensForETH(_amountIn, 0, swapCrvPath, address(this), now)[swapCrvPath.length - 1];
+            // Buy WETH, not ETH - this will save some gas when LP'ing
+            amountOut = swapRouter.swapExactTokensForTokens(_amountIn, 0, swapCrvPath, address(this), now)[swapCrvPath.length - 1];
         }
         require(amountOut > 0, "Error Swapping Tokens");
         return amountOut;
@@ -166,6 +180,7 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         }
         swapRouter = IUniswapV2Router02(activeDex);
         IERC20(crv).safeApprove(activeDex, uint256(-1));
+        IERC20(weth).safeApprove(activeDex, uint256(-1));
     }
 
     function sweep(address _token) external onlyGovernance {
