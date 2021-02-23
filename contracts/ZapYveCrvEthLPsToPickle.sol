@@ -286,10 +286,6 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
     }
 
     receive() external payable {
-        //_zapIn(true, msg.value);
-        //Don't zap any ETH we receive from our DEX
-        if (msg.sender != activeDex && msg.sender != sushiswapRouter) {
-            _zapIn(true, msg.value);
-        }
+        _zapIn(true, msg.value);
     }
 }
