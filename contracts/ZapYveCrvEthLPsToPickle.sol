@@ -113,7 +113,7 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         //  Check if it's worthwhile to use the Yearn yveCRV vault
         bool useVault = shouldUseVault(lpReserveA, lpReserveB);
 
-        // Logic tree below is used to calculate swap amounts based on conditions: useVault and Zap token type
+        // Logic tree below is used to calculate amounts and then swap based on useVault and Zap token type
         if(useVault){
             // Calculate swap amount
             uint256 amountToSwap = calculateSwapAmount(_isEth, _haveAmount);
@@ -140,9 +140,8 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
             );
         }
         else{
-            //  CRV swaps don't handle native ETH, only WETH, so must use a different function
-            IUniswapV2Router02(sushiswapRouter).addLiquidity(    
-                //weth, yveCrv, IERC20(weth).balanceOf(address(this)), yVault.balanceOf(address(this)), 0, 0, address(this), now
+            //  To save gas, CRV handles only weth, so we use a different function to add liquidity when holding weth
+            IUniswapV2Router02(sushiswapRouter).addLiquidity(
                 yveCrv, weth, yVault.balanceOf(address(this)), IERC20(weth).balanceOf(address(this)), 0, 0, address(this), now
             );
         }
@@ -151,9 +150,10 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         pickleJar.depositAll();
         IERC20(address(pickleJar)).safeTransfer(msg.sender, pickleJar.balanceOf(address(this)));
 
-        // Staking pickle jar tokens on behalf of user is not possible because deposits cannot be made on behalf of another address
-        // uint256 pickleBalance = IERC20(address(pickleJar)).balanceOf(address(this));
-        // pickleStake.deposit(26, pickleBalance); // 26 is the Pool ID for ETH/yveCRV SLPs
+        // This is where we would stake pickle jar tokens but unfortunately
+        // the Pickle staking contract does not permit deposits 
+        // on behalf of another user / address
+        // https://github.com/pickle-finance/protocol/blob/db62174dd0c95839057c91406ee361575530b359/src/yield-farming/masterchef.sol#L212
     }
 
     function _tokenSwap(bool _isEth, uint256 _amountIn) internal returns (uint256) {
@@ -199,7 +199,6 @@ contract ZapYveCrvEthLPsToPickle is Ownable {
         uint256 pool1ratio = reserveB.mul(safetyFactor).div(reserveA);
         // Get asset ratio of LP pair
         uint256 pool2ratio = lpReserveB.mul(safetyFactor).div(lpReserveA);
-
         return pool1ratio > pool2ratio; // Use vault only if pool 2 offers a better price
     }
 
